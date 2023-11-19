@@ -1,3 +1,10 @@
+"""
+## Delete a table in Postgres
+
+This DAG deletes a table in Postgres. It is used to clean up the table
+created by the `query_book_vectors` DAG during development.
+"""
+
 from airflow.decorators import dag
 from pendulum import datetime
 from airflow.providers.postgres.operators.postgres import PostgresOperator

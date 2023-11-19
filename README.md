@@ -1,49 +1,38 @@
-Overview
-========
+Orchestrate pgvector operations with Apache Airflow
+===================================================
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+This repository contains the DAG code used in the [Orchestrate pgvector operations with Apache Airflow tutorial](https://docs.astronomer.io/learn/airflow-pgvector). 
 
-Project Contents
-================
+The DAG in this repository uses the following package:
 
-Your Astro project contains the following files and folders:
+- [Airflow pgvector provider](https://airflow.apache.org/docs/apache-airflow-providers-pgvector/stable/index.html). 
+- [OpenAI python client](https://platform.openai.com/docs/api-reference)
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes two example DAGs:
-    - `example_dag_basic`: This DAG shows a simple ETL data pipeline example with three TaskFlow API tasks that run daily.
-    - `example_dag_advanced`: This advanced DAG showcases a variety of Airflow features like branching, Jinja templates, task groups and several Airflow operators.
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+# How to use this repository
 
-Deploy Your Project Locally
-===========================
+This section explains how to run this repository with Airflow. Note that you will need to copy the contents of the `.env_example` file to a newly created `.env` file.
+The Postgres connection defined in the `.env_example` file will connect to the secondary Postgres database that is created when you run `astro dev start`. This secondary Postgres database already has `pgvector` installed.
 
-1. Start Airflow on your local machine by running 'astro dev start'.
+You will need to provide an [OpenAI API key of at least tier 1](https://platform.openai.com/docs/guides/rate-limits/) in the `.env` file to use OpenAI for embeddings. If you do not have an OpenAI API key you can change the code in the `create_embeddings` function in the `query_book_vecotrs.py` file to use a different embedding method (note that you will likely also need to adjust the `MODEL_VECTOR_LENGTH` if you do this).
 
-This command will spin up 4 Docker containers on your machine, each for a different Airflow component:
+Download the [Astro CLI](https://docs.astronomer.io/astro/cli/install-cli) to run Airflow locally in Docker. `astro` is the only package you will need to install locally.
 
-- Postgres: Airflow's Metadata Database
-- Webserver: The Airflow component responsible for rendering the Airflow UI
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+1. Run `git clone https://github.com/astronomer/airflow-pgvector-tutorial.git` on your computer to create a local clone of this repository.
+2. Install the Astro CLI by following the steps in the [Astro CLI documentation](https://docs.astronomer.io/astro/cli/install-cli). Docker Desktop/Docker Engine is a prerequisite, but you don't need in-depth Docker knowledge to run Airflow with the Astro CLI.
+3. Run `astro dev start` in your cloned repository.
+4. After your Astro project has started. View the Airflow UI at `localhost:8080`.
 
-2. Verify that all 4 Docker containers were created by running 'docker ps'.
+In this project `astro dev start` spins up 5 Docker containers:
 
-Note: Running 'astro dev start' will start your project with the Airflow Webserver exposed at port 8080 and Postgres exposed at port 5432. If you already have either of those ports allocated, you can either [stop your existing Docker containers or change the port](https://docs.astronomer.io/astro/test-and-troubleshoot-locally#ports-are-not-available).
+- The Airflow webserver, which runs the Airflow UI and can be accessed at `https://localhost:8080/`.
+- The Airflow scheduler, which is responsible for monitoring and triggering tasks.
+- The Airflow triggerer, which is an Airflow component used to run deferrable operators.
+- The Airflow metadata database, which is a Postgres database that runs on port 5432.
+- A second local postgres database with pgvector installed, which runs on port 5433.
 
-3. Access the Airflow UI for your local Airflow project. To do so, go to http://localhost:8080/ and log in with 'admin' for both your Username and Password.
+## Resources
 
-You should also be able to access your Postgres Database at 'localhost:5432/postgres'.
-
-Deploy Your Project to Astronomer
-=================================
-
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://docs.astronomer.io/cloud/deploy-code/
-
-Contact
-=======
-
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+- [Orchestrate pgvector operations with Apache Airflow](https://docs.astronomer.io/learn/airflow-pgvector).
+- [Airflow Weaviate provider documentation](https://airflow.apache.org/docs/apache-airflow-providers-pgvector/stable/index.html).
+- [pgvector repository](https://github.com/pgvector/pgvector).
+- [OpenAI API reference](https://platform.openai.com/docs/api-reference).

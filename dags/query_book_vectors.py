@@ -1,45 +1,42 @@
+"""
+## Vectorize book descriptions with OpenAI and store them in Postgres with pgvector
+
+This DAG shows how to use the OpenAI API 1.0+ to vectorize book descriptions and 
+store them in Postgres with the pgvector extension.
+It will also help you pick your next book to read based on a mood you describe.
+
+You will need to set the following environment variables:
+- `AIRFLOW_CONN_POSTGRES_DEFAULT`: an Airflow connection to your Postgres database
+    that has pgvector installed
+- `OPENAI_API_KEY`: your OpenAI API key
+"""
+
 from airflow.decorators import dag, task
 from airflow.models.baseoperator import chain
-from pendulum import datetime
 from airflow.models.param import Param
-from airflow.providers.pgvector.hooks.pgvector import PgVectorHook
 from airflow.providers.pgvector.operators.pgvector import PgVectorIngestOperator
 from airflow.providers.postgres.operators.postgres import PostgresOperator
-from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.operators.empty import EmptyOperator
+from airflow.exceptions import AirflowSkipException
+from pendulum import datetime
+from openai import OpenAI
 import uuid
-from transformers import AutoTokenizer, AutoModel
-from torch import no_grad
 import re
 import os
-from airflow.exceptions import AirflowSkipException
-
-
-from openai import OpenAI
 
 POSTGRES_CONN_ID = "postgres_default"
 TEXT_FILE_PATH = "include/book_data.txt"
 TABLE_NAME = "Book"
-HUGGING_FACE_MODEL = "consciousAI/cai-lunaris-text-embeddings"
+OPENAI_MODEL = "text-embedding-ada-002"
+MODEL_VECTOR_LENGTH = 1536
 
 
 def create_embeddings(text: str, model: str):
-    # tokenizer = AutoTokenizer.from_pretrained(model)
-    # model = AutoModel.from_pretrained(model)
-
-    # inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-
-    # with no_grad():
-    #     outputs = model(**inputs)
-
-    # embeddings = outputs.last_hidden_state.mean(dim=1)
-
+    """Create embeddings for a text with the OpenAI API."""
     client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    response = client.embeddings.create(input = text, model="text-embedding-ada-002")
-    print(response.data[0].embedding)
+    response = client.embeddings.create(input=text, model=model)
     embeddings = response.data[0].embedding
 
-    return embeddings #embeddings.tolist()[0]
+    return embeddings
 
 
 @dag(
@@ -49,7 +46,7 @@ def create_embeddings(text: str, model: str):
     tags=["pgvector"],
     params={
         "book_mood": Param(
-            "Exploration of mind and consciousness through neuroscience and philosophical inquiry.",
+            "A philosophical book about consciousness.",
             type="string",
             description="Describe the kind of book you want to read.",
         ),
@@ -95,7 +92,8 @@ def query_book_vectors():
                 )
 
             print(
-                f"Created a list with {len(list_of_params)} elements while skipping {num_skipped_lines} lines."
+                f"Created a list with {len(list_of_params)} elements "
+                " while skipping {num_skipped_lines} lines."
             )
             return list_of_params
 
@@ -125,19 +123,12 @@ def query_book_vectors():
         embeddings = create_embeddings(text=query, model=model)
         return embeddings
 
-    @task
-    def get_model_vector_length(model: str) -> int:
-        model = AutoModel.from_pretrained(model)
-        embedding_size = model.config.hidden_size
-        return embedding_size
-
-    vector_length = get_model_vector_length(model=HUGGING_FACE_MODEL)
     book_data = import_book_data(text_file_path=TEXT_FILE_PATH, table_name=TABLE_NAME)
     book_embeddings = create_embeddings_book_data.partial(
-        model=HUGGING_FACE_MODEL,
+        model=OPENAI_MODEL,
         already_imported_books=get_already_imported_book_ids.output,
     ).expand(book_data=book_data)
-    query_vector = create_embeddings_query(model=HUGGING_FACE_MODEL)
+    query_vector = create_embeddings_query(model=OPENAI_MODEL)
 
     enable_vector_extension_if_not_exists = PostgresOperator(
         task_id="enable_vector_extension_if_not_exists",
@@ -158,7 +149,7 @@ def query_book_vectors():
             vector VECTOR(%(vector_length)s)
         );
         """,
-        parameters={"vector_length": 1536}#vector_length},
+        parameters={"vector_length": MODEL_VECTOR_LENGTH},
     )
 
     import_embeddings_to_pgvector = PgVectorIngestOperator.partial(
@@ -168,7 +159,8 @@ def query_book_vectors():
         sql=(
             f"INSERT INTO {TABLE_NAME} "
             "(book_id, title, year, author, description, vector) "
-            "VALUES (%(book_id)s, %(title)s, %(year)s, %(author)s, %(description)s, %(vector)s) "
+            "VALUES (%(book_id)s, %(title)s, %(year)s, "
+            "%(author)s, %(description)s, %(vector)s) "
             "ON CONFLICT (book_id) DO NOTHING;"
         ),
     ).expand(parameters=book_embeddings)
@@ -192,26 +184,13 @@ def query_book_vectors():
         print(f"Book suggestion for '{query}':")
         print(query_result)
 
-    # @task
-    # def clean_postgres_cache(conn_id: str):
-    #     hook = PostgresHook(postgres_conn_id=POSTGRES_CONN_ID)
-    #     conn = hook.get_conn()
-    #     cursor = conn.cursor()
-    #     try:
-    #         conn.autocommit = True  # Set autocommit to True to avoid transaction block
-    #         cursor.execute(f"UPDATE {TABLE_NAME} SET author = 'King' WHERE author = 'Stephen King';")
-    #     finally:
-    #         cursor.close()
-    #         conn.close()
-
     chain(
-        [enable_vector_extension_if_not_exists, vector_length],
+        enable_vector_extension_if_not_exists,
         create_table_if_not_exists,
         get_already_imported_book_ids,
         import_embeddings_to_pgvector,
         get_a_book_suggestion,
         print_suggestion(query_result=get_a_book_suggestion.output),
-        # clean_postgres_cache(conn_id=POSTGRES_CONN_ID),
     )
 
     chain(query_vector, get_a_book_suggestion)
