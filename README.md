@@ -33,6 +33,6 @@ In this project `astro dev start` spins up 5 Docker containers:
 ## Resources
 
 - [Orchestrate pgvector operations with Apache Airflow](https://docs.astronomer.io/learn/airflow-pgvector).
-- [Airflow Weaviate provider documentation](https://airflow.apache.org/docs/apache-airflow-providers-pgvector/stable/index.html).
+- [Airflow pgvector provider documentation](https://airflow.apache.org/docs/apache-airflow-providers-pgvector/stable/index.html).
 - [pgvector repository](https://github.com/pgvector/pgvector).
 - [OpenAI API reference](https://platform.openai.com/docs/api-reference).
