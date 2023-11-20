@@ -13,7 +13,7 @@ The DAG in this repository uses the following package:
 This section explains how to run this repository with Airflow. Note that you will need to copy the contents of the `.env_example` file to a newly created `.env` file.
 The Postgres connection defined in the `.env_example` file will connect to the secondary Postgres database that is created when you run `astro dev start`. This secondary Postgres database already has `pgvector` installed.
 
-You will need to provide an [OpenAI API key of at least tier 1](https://platform.openai.com/docs/guides/rate-limits/) in the `.env` file to use OpenAI for embeddings. If you do not have an OpenAI API key you can change the code in the `create_embeddings` function in the `query_book_vecotrs.py` file to use a different embedding method (note that you will likely also need to adjust the `MODEL_VECTOR_LENGTH` if you do this).
+You will need to provide an [OpenAI API key of at least tier 1](https://platform.openai.com/docs/guides/rate-limits/) in the `.env` file to use OpenAI for embeddings. If you do not have an OpenAI API key you can change the code in the `create_embeddings` function in the `query_book_vectors.py` file to use a different embedding method (note that you will likely also need to adjust the `MODEL_VECTOR_LENGTH` if you do this).
 
 Download the [Astro CLI](https://docs.astronomer.io/astro/cli/install-cli) to run Airflow locally in Docker. `astro` is the only package you will need to install locally.
 
