@@ -53,6 +53,37 @@ def create_embeddings(text: str, model: str):
     },
 )
 def query_book_vectors():
+    enable_vector_extension_if_not_exists = PostgresOperator(
+        task_id="enable_vector_extension_if_not_exists",
+        postgres_conn_id=POSTGRES_CONN_ID,
+        sql="CREATE EXTENSION IF NOT EXISTS vector;",
+    )
+
+    create_table_if_not_exists = PostgresOperator(
+        task_id="create_table_if_not_exists",
+        postgres_conn_id=POSTGRES_CONN_ID,
+        sql=f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (          
+            book_id UUID PRIMARY KEY,
+            title TEXT,
+            year INTEGER,
+            author TEXT,
+            description TEXT,
+            vector VECTOR(%(vector_length)s)
+        );
+        """,
+        parameters={"vector_length": MODEL_VECTOR_LENGTH},
+    )
+
+    get_already_imported_book_ids = PostgresOperator(
+        task_id="get_already_imported_book_ids",
+        postgres_conn_id=POSTGRES_CONN_ID,
+        sql=f"""
+        SELECT book_id
+        FROM {TABLE_NAME};
+        """,
+    )
+
     @task
     def import_book_data(text_file_path: str, table_name: str) -> list:
         "Read the text file and create a list of dicts from the book information."
@@ -97,15 +128,6 @@ def query_book_vectors():
             )
             return list_of_params
 
-    get_already_imported_book_ids = PostgresOperator(
-        task_id="get_already_imported_book_ids",
-        postgres_conn_id=POSTGRES_CONN_ID,
-        sql=f"""
-        SELECT book_id
-        FROM {TABLE_NAME};
-        """,
-    )
-
     @task
     def create_embeddings_book_data(
         book_data: dict, model: str, already_imported_books: list
@@ -130,28 +152,6 @@ def query_book_vectors():
     ).expand(book_data=book_data)
     query_vector = create_embeddings_query(model=OPENAI_MODEL)
 
-    enable_vector_extension_if_not_exists = PostgresOperator(
-        task_id="enable_vector_extension_if_not_exists",
-        postgres_conn_id=POSTGRES_CONN_ID,
-        sql="CREATE EXTENSION IF NOT EXISTS vector;",
-    )
-
-    create_table_if_not_exists = PostgresOperator(
-        task_id="create_table_if_not_exists",
-        postgres_conn_id=POSTGRES_CONN_ID,
-        sql=f"""
-        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (          
-            book_id UUID PRIMARY KEY,
-            title TEXT,
-            year INTEGER,
-            author TEXT,
-            description TEXT,
-            vector VECTOR(%(vector_length)s)
-        );
-        """,
-        parameters={"vector_length": MODEL_VECTOR_LENGTH},
-    )
-
     import_embeddings_to_pgvector = PgVectorIngestOperator.partial(
         task_id="import_embeddings_to_pgvector",
         trigger_rule="none_failed",
@@ -170,7 +170,7 @@ def query_book_vectors():
         postgres_conn_id=POSTGRES_CONN_ID,
         trigger_rule="none_failed",
         sql=f"""
-            SELECT title, year, description
+            SELECT title, year, author, description
             FROM {TABLE_NAME}
             ORDER BY vector <-> CAST(%(query_vector)s AS VECTOR)
             LIMIT 1;
@@ -181,8 +181,15 @@ def query_book_vectors():
     @task
     def print_suggestion(query_result, **context):
         query = context["params"]["book_mood"]
+        book_title = query_result[0][0]
+        book_year = query_result[0][1]
+        book_author = query_result[0][2]
+        book_description = query_result[0][3]
         print(f"Book suggestion for '{query}':")
-        print(query_result)
+        print(
+            f"You should read {book_title} by {book_author}, published in {book_year}!"
+        )
+        print(f"Goodreads describes the book as: {book_description}")
 
     chain(
         enable_vector_extension_if_not_exists,
