@@ -1,4 +1,3 @@
-version: '3.1'
 services:
   postgres_pgvector:
     image: ankane/pgvector
@@ -16,7 +15,7 @@ services:
   scheduler:
     networks:
       - airflow
-  webserver:
+  api-server:
     networks:
       - airflow
   triggerer:
