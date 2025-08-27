@@ -11,7 +11,7 @@ You will need to set the following environment variables:
 - `OPENAI_API_KEY`: your OpenAI API key
 """
 
-from airflow.decorators import dag, task
+from airflow.sdk import dag, task
 from airflow.models.baseoperator import chain
 from airflow.models.param import Param
 from airflow.providers.pgvector.operators.pgvector import PgVectorIngestOperator
@@ -40,9 +40,8 @@ def create_embeddings(text: str, model: str):
 
 
 @dag(
-    start_date=datetime(2023, 9, 1),
+    start_date=datetime(2025, 8, 1),
     schedule=None,
-    catchup=False,
     tags=["pgvector"],
     params={
         "book_mood": Param(
